@@ -1,0 +1,324 @@
+\documentclass[a4paper,fleqn,10pt,openright,oldfontcommands]{memoir}    
+\usepackage{amsmath}
+\usepackage[minionint,textosf,mathlf]{MinionPro}
+\usepackage[english]{babel}
+
+% symbols
+\newcommand{\pd}{\partial}
+\newcommand{\dg}{\dagger}
+\renewcommand{\a}{\alpha}
+\renewcommand{\b}{\beta}
+\renewcommand{\d}{\delta}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\e}{\varepsilon}
+\newcommand{\f}{\phi}
+\newcommand{\g}{\gamma}
+\newcommand{\h}{\eta}
+\renewcommand{\H}{\mathcal{H}}
+\renewcommand{\k}{\kappa}
+\renewcommand{\l}{\lambda}
+\renewcommand{\L}{\mathcal{L}}
+\newcommand{\q}{\theta}
+\newcommand{\Q}{\mathcal{Q}}
+\renewcommand{\r}{\rho}
+\newcommand{\s}{\sigma}
+\renewcommand{\t}{\tau}
+\newcommand{\U}{\mathcal{U}}
+\newcommand{\w}{\omega}
+
+% math notation
+\newcommand{\pdff}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\abs}[1]{\left\vert #1 \right\vert}
+\newcommand{\ev}[1]{\left\langle #1 \right\rangle}
+\newcommand{\ten}[1]{\underline{\underline{#1}}}
+
+\begin{document}
+
+\pagestyle{empty}
+
+\section*{Maximum Posterior Estimation for a Mixture Model with Real and Categorical Features}
+
+We have a set of $N$ examples with real features $x_n$, and categorical features $y_n$. The hidden variable $z_n$ will the denote the protype membership. The likelihood for the observations given the parameters $\theta$ 
+
+
+\subsubsection*{Observations}
+\begin{itemize}
+    \item $\{ x_n^r \}$: Real valued feature $r$ for example $n$ 
+    \item $\{ y_n^c \}$: Categorical valued feature $c$ for example $n$ 
+\end{itemize}
+
+\subsubsection*{Latent States}
+\begin{itemize}
+    \item $\{ z_n \}$: Prototype membership for example $n$  
+\end{itemize}
+
+\subsubsection*{Model Parameters $\theta$}
+\begin{itemize}
+    \item $\{ \pi_k \}$: Prior probability an example belonging to prototype $k$.
+    \item $\{ \mu_k^r \}$: Observation mean for feature $r$ in prototype $k$.
+    \item $\{ \lambda_k^r \}$: Observation precision (1/variance) 
+          for feature $r$ in prototype $k$.
+    \item $\{ \rho_k^c \}$ Categorical probabilities for feature 
+          $c$ in in prototype $k$
+\end{itemize}
+
+\subsection*{Likelihood}
+
+\begin{align*}
+	p(x, y | \theta) 
+		&= \sum_z p(x, y | z, \theta) \\
+	    &= \prod_n 
+	       \sum_{z_n} 
+	       \prod_k 
+	       [ p(x_n | \theta_k) 
+	         p(y_n | \theta_k) 
+	         p(z_n) ]^{z_{n, k}}
+\end{align*}
+\begin{align*}
+	p(x_n | \theta_k) 
+		&= \prod_r N(x_n^r | \mu_k^r, \lambda_k^r) \\
+		&= \prod_r (\lambda_k^r / 2 \pi)^{1/2} 
+		           \exp [-\tfrac{1}{2} \lambda_k^r (x - \mu_k^r)^2 ] \\
+%		
+	p(y_n | \theta_k) 
+		&= \prod_c {\rm Categ}(y_n^c | \rho_k^c) \\
+		&= \prod_c \prod_d (\rho_{k,d}^{c})^{y_{n,d}^{c}} \\
+%
+	p(z_n) &= \prod_k \pi_k^{z_{n, k}}
+\end{align*}
+
+\subsection*{Priors}
+
+ \begin{align*}
+    p(\theta)
+        &= p(\pi) \prod_k \prod_r p(\mu_k^r, \lambda_k^r) \prod_c p(\rho_k^c) \\
+    \pi &\sim \mathrm{Dir}(\pi_0) \\
+    \lambda^r_k 
+      &\sim \mathrm{Gamma}(a^r_k, b^r_k) \\
+    \mu^r_k 
+      &\sim \mathrm{N}(m^r_k, \beta^r_k \lambda^r_k) \\
+    \rho^c_k
+      &\sim \mathrm{Dir}(\alpha^c_k) \\
+\end{align*}
+
+
+\subsection*{Conjugate Exponential Form}
+
+Likelihood
+\begin{align*}
+	p(x_n | \eta_k) 
+		&= \prod_r p(x_n^r | \eta_k^r) \\
+		&= \prod_r h(x_n^r) g(\eta_k^r) \exp[ \eta_k^r \cdot u(x_n^r) ] \\
+%
+    p(y_n | \eta_k) 
+		&= \prod_c p(y_n^c | \eta_k^c) \\
+		&= \prod_c h(y_n^c) g(\eta_k^c) \exp[ \eta_k^c \cdot u(y_n^c) ] \\
+\end{align*}
+Prior
+\begin{align*}
+    p(\eta_k | \nu_k, \chi_k) 
+        =& \prod_r p(\eta_k^r | \nu_k^r, \chi_k^r) 
+           \prod_c p(\eta_k^c | \nu_k^c, \chi_k^c) \\
+%
+        =& \prod_r f(\nu_k^r, \chi_k^r) g(\eta_k^r)^{\nu_k^r} \exp[ \eta_k^r \cdot \chi_k^r ] \\
+         & \prod_c f(\nu_k^c, \chi_k^c) g(\eta_k^c)^{\nu_k^c} \exp[ \eta_k^c \cdot \chi_k^c ]
+\end{align*}
+
+\subsubsection{Real Features}
+\begin{itemize}
+	\item $h(x_n) = 1$
+	\item $g(\eta_k^r) = (\eta_{k,1}^r / 2 \pi)^{1/2} \exp[- (\eta_{k,2}^r)^2 / 2 \eta_{n1}^r ]$
+	\item $\eta_k^r = \{ \lambda_k^r, \lambda_k^r \mu_k^r \}$
+	\item $u(x_n) = \{ -\tfrac{1}{2} x_n^2, x_n \}$
+    \item $\nu_k^r = \beta^r_k = 2 a^r_k - 1$
+    \item $\chi_k^r = \{ -\tfrac{1}{2}(\beta^r_k (m^r_k)^2 + 2 b^r_k), \beta^r_k m^r_k \} $
+\end{itemize}
+
+\subsubsection{Categorical Features}
+\begin{itemize}
+	\item $h(y_n) = 1$
+	\item $g(\eta_k^c) = 1$     
+	\item $\eta_k^c = \{ \log \rho_{k,d}^c \}$
+	\item $u(y_n) = \{ y_{n,d} \}$
+    \item $\nu_k^c = 1$
+    \item $\chi_k^c = \{ \alpha^c_{k,d} - 1 \} $
+\end{itemize}
+
+\section*{Maximum Posterior Estimation}
+
+For maximum likelihood esitmation, we optimize define a log likelihood $L$, defined as:
+\begin{align*}
+	L^{\rm ml}  &= \log p(x, y | \eta)    
+\end{align*}
+to find
+\begin{align*}
+    \eta^{\rm ml} &= \operatorname*{arg\,max}_\eta~ \log p(x, y | \eta)
+           = \operatorname*{arg\,max}_\eta~ L^{\rm ml}
+\end{align*}
+In maximum posterior estimation, we optimize
+\begin{align*}
+    L^{\rm map}  &= \log p(x, y, \eta) \\
+                 &= \log p(x, y | \eta) + \log p(\eta)  \\
+                 &= L^{\rm ml} + L^{\rm prior}
+\end{align*}   
+to obtain
+\begin{align*}
+  \eta^{\rm map} 
+    &= \operatorname*{arg\,max}_\eta~ 
+       \log p(\eta | x, y) \\
+    &= \operatorname*{arg\,max}_\eta~ 
+       \log \left[ \frac{p(x, y | \eta) p(\eta)}{p(x,y)} \right] \\
+    &= \operatorname*{arg\,max}_\eta~ \log[p(x, y | \eta) p(\eta)] 
+     = \operatorname*{arg\,max}_\eta~ L^{\rm map}
+\end{align*}
+
+In order to maximize $L^{\rm map}$ with respect to the parameters $\eta$ we have to solve the set of equations:
+\[
+  \pdff{L^{\rm map}}{\eta^{\{r,c\}}_{k,i}}  %
+  = \pdff{\left( L^{\rm ml} + L^{\rm prior} \right)}{\eta^{\{r,c\}}_{k,i}} %
+  = 0
+\]
+For each real feature $r$ we must solve for two variables $i = {1, 2}$. For each categorical feature $c$ we must solve for $D^c$ variables $d = {1, \ldots, D^c}$. 
+
+\subsection*{Real Features}
+
+The partial derivatives of $L^{\rm ml}$ expand to:
+\begin{align*}
+	\pdff{L^{\rm ml}}{\eta_{k,i}^r}
+	  &= \sum_n \frac{p(x_n | \eta_k^r) p(y_n | \eta_k^c) \pi_k} %
+	                 {\sum_l p(x_n | \eta_l^r) p(y_n | \eta_l^c) \pi_l}
+	            \left[
+	            	\frac{1}{g}\pdff{g(\eta_k^r)}{\eta_{k,i}^r}
+	            	+ u_i(x_n)
+	            \right] \\     
+	  &= \sum_n \gamma_{nk}
+	            \left[
+	            	\frac{1}{g} \pdff{g(\eta_k^r)}{\eta_{k,i}^r}
+	            	+ u_i(x_n)
+	            \right]
+\end{align*}
+with the responsibilities $\gamma_{nk}$ defined by:
+\begin{align*}
+    \gamma_{nk}
+      &= \frac{p(x_n | \eta_k^r) p(y_n | \eta_k^c) \pi_k}
+              {\sum_l p(x_n | \eta_l^r) p(y_n | \eta_l^c) \pi_l}
+\end{align*}
+The derivatives of $L^{\rm prior}$ are given by:
+\begin{align*}
+    \pdff{L^{\rm prior}}{\eta_{k,i}^r}
+    &= \frac{\nu_k^r}{g} \pdff{g}{\eta_{k,i}^r} + \chi_{k,i}^r
+\end{align*}
+Adding both terms together, the condition $\pd L^{\rm map} / \pd \eta_{k,i}^r = 0$ becomes:
+\begin{align*}
+    0
+    &=
+      \frac{\nu_k^r + N_k}{g} \pdff{g}{\eta_{k,i}^r} 
+      + \chi_{k,i}^r 
+      + \sum_n \gamma_{nk} u_i(x_n^r)  &
+    N_k
+    &= \sum_n \gamma_{nk}
+\end{align*}
+This can be interpreted as a weighted average of the prior for the sufficient statistics $\tilde \chi$ and averaged sufficient statistics of the data:
+\begin{align*}
+	  \frac{1}{g}\pdff{g(\eta_k^r)}{\eta_{k,i}^r}
+	  &= -\frac{1}{\nu_k^r + N_k} 
+         \Big[
+           \nu_k^r \tilde{\chi}_{k,i}^r 
+           + N_k \ev{u_i(x_n^r)}_{\gamma_{nk}} 
+         \Big] 
+\end{align*}
+with
+\begin{align*}
+      \tilde{\chi}_{k,i}^r &= \frac{\chi_{k,i}^r}{\nu_k^r } &
+      \ev{u_i(x_n^r)}_{\gamma_{nk}} &=
+      \frac{1}{N_k} \sum_n \gamma_{nk} u_i(x_n^r)
+\end{align*}
+If we now substitute the expressions for $\eta_k^r$, $g$ and $\chi_k^r$ given above, we obtain:
+\begin{align*}
+	  (\lambda_k^r)^{-1} + (\mu_k^r)^2 
+	  & =
+      \frac{1}{\nu_k^r + N_k}
+      \Big[
+        \beta^r_k (m^r_k)^2 + 2 b^r_k
+        +
+        N_k \ev{(x_n^r)^2}_{\gamma_{nk}}
+      \Big]
+\end{align*}
+and
+\begin{align*}
+      \mu_k^r 
+      & =
+      \frac{1}{\nu_k^r + N_k}
+      \Big[
+        \beta_k^r m_k^r
+        +
+        N_k \ev{x_n^r}_{\gamma_{nk}}
+      \Big]
+\end{align*}
+If we now wish to consider the case where we have a prior only on $\lambda$ and not on $\mu$, we
+set $a > 1/2$, and $\beta = 0$. We then substitute $\nu_k \mapsto \beta_k$ in the equation for $\mu_k$ and $\nu_k \mapsto 2 a_k - 1$ in the equation for $\lambda$, to obtain:  
+\begin{align*}
+	\mu_k^r &= \langle x_n^r \rangle_{\gamma_{nk}} \\
+	(\sigma_k^r)^2 &= (\lambda_k^r)^{-1} 
+    =
+    \frac{1}{2 a_k - 1 + N_k}
+    \Big[
+      b^r_k
+      +
+      N_k \ev{(x_n^r)^2}_{\gamma_{nk}}
+    \Big]    
+    - \langle x_n^r \rangle^2_{\gamma_{nk}}
+\end{align*}
+
+
+\subsection{Categorical Features}
+
+For the categorical variables we must introduce a Lagrange multiplier to enforce the constraint $\sum_d \rho_{k,d}^c = \sum_d \exp [ \eta_{k,d}^c ] = 1$. 
+\begin{align*}
+	0 &= 
+	\pdff{}{\eta_{k,d}^c} 
+	\left[
+		L^{\rm map} + \lambda
+			\left(
+				1 - \sum_e \exp [ \eta_{k,e}^c ]
+			\right)
+	\right] \\
+	&= 	\pdff{L^{\rm map}}{\eta_{k,d}^c} - \lambda \exp[ \eta_{k,d}^c ] \\
+\end{align*}
+since $g(\eta_k^c) = 1$ and $\nu_k^c = 1$, the expression for the derivative of $L^{\rm map}$ reduces to:
+\begin{align*}
+    \pdff{L^{\rm map}}{\eta_{k,d}^c}
+    &=
+      \chi_{k,d}^c 
+      + \sum_n \gamma_{nk} u_i(y_n^c)  &
+\end{align*}
+The solution to the constrained equation is given, up to a normalisation $\lambda$ by
+\begin{align*}
+	\rho_{k,d}^c 
+	&= \exp[ \eta_{k,d}^c ]
+	=  \frac{1}{\lambda} \left(\chi_{k,d}^c  + \sum_n \g_{nk} y_{n,d} \right) 
+\end{align*}
+Whereas $\lambda$ can be found by noting that:
+\begin{align*}
+	1
+	&= \sum_d \exp[ \eta_{k,d}^c ]
+	=  \frac{1}{\lambda} \sum_d \left(\chi_{k,d}^c  + \sum_n \g_{nk} y_{n,d} \right) 
+\end{align*}
+So
+\begin{align*}
+	\lambda
+	=  \sum_d \left(\chi_{k,d}^c  + \sum_n \g_{nk} y_{n,d} \right)  
+\end{align*}
+Note that seting $\chi_{k,d}^c = 0$ reduces the updates to the maximum likelihood case.
+
+\section*{Algorithm}
+
+Repeat until $L$ converges:
+\begin{itemize}
+	\item Calculate $\gamma_{nk}$ using parameters $\theta^i$. 
+		  Probabilities for missing features are set to 1. 
+	\item Calculate updates $\theta^{i+1}$ from $\gamma_{nk}$, $x_n$ and $y_n$.
+\end{itemize}
+
+
+\end{document}
