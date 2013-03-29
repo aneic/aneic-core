@@ -40,14 +40,14 @@ def get_indicator(series):
     return pd.DataFrame(dummy_mat, index=index, columns=dummy_cols)
 
 
-def kl_gamma(g_a, g_b):
+def kl_gamma(g_a, g_b, eps=1e-2):
     '''
     Calculates difference between two sets of cluster assignments
     '''
     if isinstance(g_a, pd.DataFrame):
         g_b = g_b.reindex(index=g_a.index)
-    g_a = np.asarray(g_a)
-    g_b = np.asarray(g_b)
+    g_a = norm(np.asarray(g_a) + eps, 1)
+    g_b = norm(np.asarray(g_b) + eps, 1)
     if g_a.shape != g_b.shape:
         return 1
     else:
@@ -146,7 +146,7 @@ def _log_pxyz(real, cat, mu, l, rho, pi):
     return (log_px_z.fillna(0) + log_py_z.fillna(0)) + np.log(pi)
 
 
-def _log_pq(mu, l, rho, a=None, b=None, alpha=None, beta=None):
+def _log_pq(mu, l, rho, pi, a=None, b=None, alpha=None, beta=None):
     import scipy.special as sp
     if (a is None) or (b is None):
         log_pl = pd.Series(np.zeros(mu.shape[1]), index=mu.columns)
@@ -165,7 +165,7 @@ def _log_pq(mu, l, rho, a=None, b=None, alpha=None, beta=None):
         log_pz = 0.
     else:
         log_pz = (sp.gammaln(beta.sum()) 
-                  + (np.log(rho) * (beta - 1) 
+                  + (np.log(pi) * (beta - 1) 
                   - sp.gammaln(beta)).sum()).sum()
 
     return log_pr + log_pl + log_pz
@@ -181,7 +181,7 @@ def e_step(real, cat,
     g = gamma.as_matrix()
     L = np.nan_to_num(g * (log_pxyz.as_matrix() - np.log(g))).sum(1).sum(0)
     # calculate prior probabilities
-    log_pq = _log_pq(mu, l, rho, a, b, alpha, beta)
+    log_pq = _log_pq(mu, l, rho, pi, a, b, alpha, beta)
     return gamma, L + log_pq.sum(0)
 
 
@@ -196,31 +196,48 @@ def m_step(real, cat,
     if (a is None) or (b is None):
         l = (X2 / G - mu**2)**(-1)
     else:
-        # OLD UPDATES
+        # conjugate exponential form
+        #
+        # p(x | eta) = g(eta) exp(eta u(x))
+        # p(eta | nu, chi) = f(n,chi) g(eta)^nu exp(eta chi)
+        # 
+        # eta = -l / 2
+        # g(l) = (l / (2 pi))^(1/2) exp(-l m^2 / 2)
+        # u(x) = x^2 - 2 mu x
+        # nu = 2 (a - 1)
+        # chi = 2 b - 2 (a-1) mu^2
+        #
+        # update
+        #
+        # dg(eta) / deta = -1/l + mu^2
+        #                = -(chi + sum u(x)) / (N + nu)
+        #
+        # (1 / l[k]) = - [chi + sum_n g[n,k] u(x[n])] / (G[k] + nu) + mu^2
         nu = 2 * (a - 1)
         chi = 2 * b - nu * mu**2
         l = ((X2 - 2 * mu * X + chi) / (G + nu) + mu**2)**(-1)
         
         # conjugate exponential form
-        #
+        
         # p(x | l) = g(l) exp(l u(x))
         # p(l | nu, chi) = f(n,chi) g(l)^nu exp(l chi)
-        # 
+        
         # g(l) = (l / (2 pi))^(1/2) exp(-l m^2 / 2)
         # u(x) = -x^2 / 2 + mu x
         # nu = 2 (a - 1)
         # chi = -b + (a-1) mu^2
-        #
+        
         # update
-        #
+        
         # dg(l) / dl = (1/l - mu^2) / 2
-        #            = (chi + sum u(x)) / (N + nu)
-        #
-        # (1 / l[k]) = 2 [chi + sum_n g[n,k] u(x[n])] / (G[k] + nu) + mu^2
+        #            = -(chi + sum u(x)) / (N + nu)
+        
+        # (1 / l[k]) = - 2 [chi + sum_n g[n,k] u(x[n])] / (G[k] + nu) + mu^2
+
         # nu = 2 * (a - 1)
         # chi = -b + (a-1) * mu**2
         # U = -0.5 * X2 + mu * X
-        # l = (2 * (chi + U) / (G + nu) + mu**2)**(-1)
+        # l = (-2 * (chi + U) / (G + nu) + mu**2)**(-1)
     # update for rho 
     counts = pd.concat([(gamma[k].T * cat.T).sum(1) for k in gamma], axis=1)
     if not alpha is None:
