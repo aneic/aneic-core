@@ -44,37 +44,120 @@ def kl_gamma(g_a, g_b, eps=1e-2):
     '''
     Calculates difference between two sets of cluster assignments
     '''
-    if isinstance(g_a, pd.DataFrame):
-        g_b = g_b.reindex(index=g_a.index)
-    g_a = norm(np.asarray(g_a) + eps, 1)
-    g_b = norm(np.asarray(g_b) + eps, 1)
-    if g_a.shape != g_b.shape:
-        return 1
-    else:
-        # element by element kl
-        kl = lambda g_a, g_b: \
-                g_a * nlog(g_a / g_b) + (1-g_a) * nlog((1-g_a) / (1-g_b))
-        # full kl
-        KL = lambda g_a, g_b: \
-                (g_a * nlog(g_a / g_b)).sum(1)
+    # ensure rows are aligned
+    if g_a.shape[0] > g_b.shape[0]:
+        g_a = g_a.reindex(g_b.index)
+    if g_b.shape[0] > g_a.shape[0]:
+        g_b = g_b.reindex(g_a.index)
+    # cast as array
+    g_a = np.asarray(g_a)    
+    g_b = np.asarray(g_b)
+    # pad columns if necessary
+    if g_a.shape[1] > g_b.shape[1]:
+        g_b = np.c_[g_b, np.zeros((g_b.shape[0], g_a.shape[1] - g_b.shape[1]))]
+    if g_b.shape[1] > g_a.shape[1]:
+        g_a = np.c_[g_a, np.zeros((g_a.shape[0], g_b.shape[1] - g_a.shape[1]))]
+    # add small number to all entries to avoid sensitivity for zero values
+    g_a = norm(g_a + eps, 1)
+    g_b = norm(g_b + eps, 1)
+    # element by element kl
+    kl = lambda g_a, g_b: \
+            g_a * nlog(g_a / g_b) + (1-g_a) * nlog((1-g_a) / (1-g_b))
+    # full kl
+    KL = lambda g_a, g_b: \
+            (g_a * nlog(g_a / g_b)).sum(1)
 
-        kl_ab = kl(g_a[:,:,None], g_b[:,None,:]).sum(0)
-        kl_ba = kl(g_b[:,None,:], g_a[:,:,None]).sum(0)
-        err = 0.5 * (kl_ab + kl_ba)
+    kl_ab = kl(g_a[:,:,None], g_b[:,None,:]).sum(0)
+    kl_ba = kl(g_b[:,None,:], g_a[:,:,None]).sum(0)
+    err = 0.5 * (kl_ab + kl_ba)
 
-        # do greedy matching to minimize classification error
-        perm = np.zeros((len(err),), 'i') - 1
+    # do greedy matching to minimize classification error
+    perm = np.zeros((len(err),), 'i') - 1
+    msk = (perm==-1)
+    while msk.any():
+        adxs = msk.nonzero()[0]
+        bdxs = np.array(list(set(range(err.shape[1])) - set(perm)))
+        k = err[adxs,:][:,bdxs].min(axis=1).argmin()
+        l = err[adxs[k], bdxs].argmin()
+        perm[adxs[k]] = bdxs[l]
         msk = (perm==-1)
-        while msk.any():
-            adxs = msk.nonzero()[0]
-            bdxs = np.array(list(set(range(err.shape[1])) - set(perm)))
-            k = err[adxs,:][:,bdxs].min(axis=1).argmin()
-            l = err[adxs[k], bdxs].argmin()
-            perm[adxs[k]] = bdxs[l]
-            msk = (perm==-1)
 
-        return 0.5 * (KL(g_a, g_b[:, perm]) + KL(g_b[:, perm], g_a)).mean()
+    return 0.5 * (KL(g_a, g_b[:, perm]) + KL(g_b[:, perm], g_a)).mean()
 
+def d_gamma(g_a, g_b, eps=0):
+    '''
+    Calculates rms distance between two cluster assignments
+    '''
+    # ensure rows are aligned
+    if g_a.shape[0] > g_b.shape[0]:
+        g_a = g_a.reindex(g_b.index)
+    if g_b.shape[0] > g_a.shape[0]:
+        g_b = g_b.reindex(g_a.index)
+    # cast as array
+    g_a = np.asarray(g_a)    
+    g_b = np.asarray(g_b)
+    # pad columns if necessary
+    if g_a.shape[1] > g_b.shape[1]:
+        g_b = np.c_[g_b, np.zeros((g_b.shape[0], g_a.shape[1] - g_b.shape[1]))]
+    if g_b.shape[1] > g_a.shape[1]:
+        g_a = np.c_[g_a, np.zeros((g_a.shape[0], g_b.shape[1] - g_a.shape[1]))]
+    # add prior to all entries
+    g_a = norm(g_a + eps, 1)
+    g_b = norm(g_b + eps, 1)
+    # element by element difference
+    err = np.abs(g_a[:,:,None] - g_b[:,None,:]).sum(axis=0)
+
+    # do greedy matching to minimize classification error
+    perm = np.zeros((len(err),), 'i') - 1
+    msk = (perm==-1)
+    while msk.any():
+        adxs = msk.nonzero()[0]
+        bdxs = np.array(list(set(range(err.shape[1])) - set(perm)))
+        k = err[adxs,:][:,bdxs].min(axis=1).argmin()
+        l = err[adxs[k], bdxs].argmin()
+        perm[adxs[k]] = bdxs[l]
+        msk = (perm==-1)
+
+    return 0.5 * np.abs(g_a - g_b[:, perm]).sum(axis=1).mean(axis=0)
+
+def err_gamma(g_a, g_b, eps=0):
+    '''
+    Calculates rms distance between two cluster assignments
+    '''
+    # ensure rows are aligned
+    if g_a.shape[0] > g_b.shape[0]:
+        g_a = g_a.reindex(g_b.index)
+    if g_b.shape[0] > g_a.shape[0]:
+        g_b = g_b.reindex(g_a.index)
+    # cast as array
+    g_a = np.asarray(g_a)    
+    g_b = np.asarray(g_b)
+    # pad columns if necessary
+    if g_a.shape[1] > g_b.shape[1]:
+        g_b = np.c_[g_b, np.zeros((g_b.shape[0], g_a.shape[1] - g_b.shape[1]))]
+    if g_b.shape[1] > g_a.shape[1]:
+        g_a = np.c_[g_a, np.zeros((g_a.shape[0], g_b.shape[1] - g_a.shape[1]))]
+    # add prior to all entries
+    g_a = norm(g_a + eps, 1)
+    g_b = norm(g_b + eps, 1)
+    # calculate classification error
+    # p(a,b) = a * (1-b) + (1-a) * b
+
+    E = lambda a,b: a * (1-b) + (1-a) * b 
+    err = E(g_a[:,:,None], g_b[:,None,:]).sum(axis=0)
+
+    # do greedy matching to minimize classification error
+    perm = np.zeros((len(err),), 'i') - 1
+    msk = (perm==-1)
+    while msk.any():
+        adxs = msk.nonzero()[0]
+        bdxs = np.array(list(set(range(err.shape[1])) - set(perm)))
+        k = err[adxs,:][:,bdxs].min(axis=1).argmin()
+        l = err[adxs[k], bdxs].argmin()
+        perm[adxs[k]] = bdxs[l]
+        msk = (perm==-1)
+
+    return 0.5 * E(g_a, g_b[:, perm]).sum(axis=1).mean(axis=0)
 
 def mi_gamma(g_a, g_b):
     '''
