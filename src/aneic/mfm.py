@@ -6,7 +6,7 @@ def norm(data, axis=None):
     if axis:
         return data / np.expand_dims(data.sum(axis), axis)  
     else: 
-        data / data.sum()
+        return data / data.sum()
 
 def nlog(x):
     '''Wraps log in nan_to_num'''
